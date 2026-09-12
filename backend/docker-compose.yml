@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: trustmesh_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trustmesh
+      POSTGRES_PASSWORD: trustmesh_dev_pwd
+      POSTGRES_DB: trustmesh
+    ports:
+      - "5432:5432"
+    volumes:
+      - trustmesh_pgdata:/var/lib/postgresql/data
+    networks:
+      - trustmesh_net          # <-- AJOUT
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: trustmesh_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@trustmesh.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - trustmesh_net          # <-- AJOUT
+
+volumes:
+  trustmesh_pgdata:
+
+networks:                      # <-- AJOUT
+  trustmesh_net:
+    name: trustmesh_network    # nom unique, pas de conflit
+    driver: bridge
