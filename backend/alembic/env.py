@@ -8,7 +8,8 @@ from alembic import context
 
 from app.database import Base
 from app.config import get_settings
-from app.models import User, TrustDNAModel, TrustScoreLog  # noqa: F401 — nécessaire pour l'autogénération
+from app.models import User, TrustDNAModel, TrustScoreLog, LoginAttempt
+
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
