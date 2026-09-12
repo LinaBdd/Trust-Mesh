@@ -1,91 +1,118 @@
 """
-AI Agent Layer — orchestre intelligemment les APIs CAMARA.
-Le LLM décide QUELS signaux collecter selon le contexte, puis explique la décision.
+AI Agent Layer — orchestre intelligemment les APIs CAMARA via function-calling natif.
 """
-import os
 import json
 import logging
+from app.config import get_settings
 from app.schemas.trust import TrustScoreResult
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
-# --- LLM : utilise Groq (gratuit, rapide) ---
 try:
     from groq import Groq
-    _llm_client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+    _llm_client = Groq(api_key=settings.groq_api_key)
     _LLM_MODEL = "llama-3.3-70b-versatile"
-    LLM_ENABLED = bool(os.getenv("GROQ_API_KEY"))
+    LLM_ENABLED = bool(settings.groq_api_key)
     if not LLM_ENABLED:
         logger.warning("GROQ_API_KEY manquant — AI Copilot désactivé")
 except ImportError:
     LLM_ENABLED = False
     _llm_client = None
     logger.warning("Groq non installé — AI Copilot désactivé")
+# ---------- Définition des CAMARA APIs comme de vrais "tools" pour le LLM ----------
 
+CAMARA_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "sim_swap",
+            "description": "Vérifie si un remplacement de carte SIM récent a été détecté sur ce numéro (signal CRITIQUE pour la fraude).",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "device_status",
+            "description": "Vérifie la connectivité et le statut de roaming de l'appareil.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "location_verification",
+            "description": "Vérifie si le pays réel de l'utilisateur correspond au pays déclaré.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+]
 
-# ---------- 1. ORCHESTRATION INTELLIGENTE ----------
+ORCHESTRATION_SYSTEM_PROMPT = """Tu es un AI Agent de sécurité qui orchestre des APIs télécom CAMARA (SIM Swap, 
+Device Status, Location Verification) pour détecter les fraudes lors de connexions.
 
-ORCHESTRATION_PROMPT = """Tu es un AI Agent de sécurité qui orchestre des APIs télécom CAMARA.
-Contexte de la tentative de connexion :
-{context}
-
-APIs disponibles :
-- sim_swap (détecte un remplacement récent de SIM) — CRITIQUE
-- number_verification (vérifie que le numéro appartient bien à l'appareil) — CRITIQUE
-- device_status (connectivité + roaming) — RECOMMANDÉ
-- location_verification (pays réel vs déclaré) — RECOMMANDÉ
-
-Retourne UNIQUEMENT un JSON de la forme :
-{{"tools_to_call": ["sim_swap", "number_verification", ...], "reasoning": "explication courte"}}
-
-Règles :
-- Si c'est un nouvel appareil OU un nouveau pays → appelle TOUS les outils
-- Si c'est un appareil et un pays connus → appelle sim_swap + number_verification uniquement
-- Maximum 4 outils
+Analyse le contexte de connexion fourni et appelle UNIQUEMENT les outils (tools) réellement nécessaires :
+- Si l'appareil et le pays sont déjà connus → appelle seulement sim_swap.
+- Si c'est un nouvel appareil OU un nouveau pays → appelle tous les outils disponibles.
+- N'appelle jamais un outil qui n'apporte pas d'information utile dans ce contexte.
 """
 
 
 async def plan_orchestration(context: dict) -> dict:
-    """Étape 2-4 du reasoning loop : Planning + Reasoning + Tool Selection."""
+    """L'agent utilise le vrai function-calling pour décider quels signaux CAMARA appeler."""
     if not LLM_ENABLED:
-        # Fallback : règle déterministe
-        tools = ["sim_swap", "number_verification"]
+        tools = ["sim_swap"]
         if context.get("is_new_device") or context.get("is_new_country"):
             tools += ["device_status", "location_verification"]
         return {"tools_to_call": tools, "reasoning": "Fallback: règle déterministe"}
 
     try:
-        prompt = ORCHESTRATION_PROMPT.format(context=json.dumps(context, indent=2))
         response = _llm_client.chat.completions.create(
             model=_LLM_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": ORCHESTRATION_SYSTEM_PROMPT},
+                {"role": "user", "content": f"Contexte de connexion :\n{json.dumps(context, indent=2)}"},
+            ],
+            tools=CAMARA_TOOLS,
+            tool_choice="auto",
             temperature=0.1,
         )
-        return json.loads(response.choices[0].message.content)
+
+        message = response.choices[0].message
+        tool_calls = message.tool_calls or []
+        tools_to_call = [tc.function.name for tc in tool_calls]
+
+        return {
+            "tools_to_call": tools_to_call,
+            "reasoning": message.content or "Sélection via function-calling natif",
+        }
     except Exception as e:
         logger.error(f"Erreur orchestration LLM: {e}")
-        return {"tools_to_call": ["sim_swap", "number_verification"], "reasoning": "Fallback"}
+        return {"tools_to_call": ["sim_swap"], "reasoning": "Fallback après erreur"}
 
 
-# ---------- 2. EXPLICATION DE LA DÉCISION (AI Security Copilot) ----------
+# ---------- 2. EXPLICATION DE LA DÉCISION (inchangé) ----------
 
-COPILOT_PROMPT = """Tu es l'AI Security Copilot de Trust Mesh.
-Explique à un administrateur sécurité, en 3 phrases max, pourquoi cette tentative de connexion
-a été classée "{risk}" et a reçu la décision "{decision}".
+COPILOT_PROMPT = """Tu es l'AI Security Copilot de Trust Mesh, un moteur de confiance adaptatif basé sur des signaux CAMARA (télécom).
 
-Détails :
+Contexte de la tentative de connexion :
 - Utilisateur : {user_name}
 - Score final : {score}/100
+- Risque : {risk} → Décision : {decision}
 - Signaux détectés :
 {signals}
 
-Sois factuel, professionnel, style analyste SOC. Ne mentionne pas de données personnelles inventées.
+Rédige une explication en 3 phrases MAXIMUM, destinée à un analyste sécurité (SOC), qui :
+1. Résume la décision en une phrase factuelle (ne répète pas les scores bruts, ils sont déjà visibles).
+2. Met en perspective le signal le plus déterminant.
+3. Propose UNE recommandation concrète et actionnable pour l'analyste.
+
+Ne mentionne jamais de données personnelles inventées. Reste factuel, concis, style analyste SOC senior.
 """
 
 
 async def explain_decision(user_name: str, result: TrustScoreResult) -> str:
-    """Génère l'explication en langage naturel (AI Security Copilot)."""
     if not LLM_ENABLED:
         return result.explanation or "Explication indisponible."
 

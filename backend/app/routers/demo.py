@@ -1,12 +1,19 @@
 """Endpoints de démonstration live pour le jury."""
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.config import get_settings
 from app.camara.sim_swap import SimSwapClient
 from app.camara.device_status import DeviceStatusClient
 from app.camara.location_verification import LocationVerificationClient
 
 router = APIRouter(prefix="/demo", tags=["demo"])
+settings = get_settings()
+
+
+def _ensure_demo_allowed():
+    if settings.environment == "production":
+        raise HTTPException(status_code=403, detail="Demo endpoints disabled in production")
 
 
 class SimSwapScenario(BaseModel):
@@ -19,6 +26,7 @@ class SimSwapScenario(BaseModel):
 @router.post("/trigger-sim-swap")
 async def trigger_sim_swap(scenario: SimSwapScenario):
     """Déclenche un scénario SIM Swap pour la démo live."""
+    _ensure_demo_allowed()
     SimSwapClient.force_scenario(
         scenario.phone_number,
         sim_swapped=True,
@@ -39,6 +47,7 @@ async def trigger_sim_swap(scenario: SimSwapScenario):
 @router.post("/reset")
 async def reset_scenarios(phone_number: str):
     """Reset les scénarios après la démo."""
+    _ensure_demo_allowed()
     SimSwapClient.clear_scenario(phone_number)
     DeviceStatusClient.clear_scenario(phone_number)
     LocationVerificationClient.clear_scenario(phone_number)

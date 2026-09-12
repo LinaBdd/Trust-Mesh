@@ -1,19 +1,24 @@
 export default function SignalBar({ signal }) {
   const pct = signal.score;
-  const color =
-    pct >= 70 ? "bg-green-500" :
-    pct >= 40 ? "bg-orange-500" : "bg-red-500";
+  const color = pct >= 70 ? "#10b981" : pct >= 40 ? "#f59e0b" : "#ef4444";
+  const icons = { sim: "📶", device: "📱", location: "📍", behaviour: "🧠" };
 
   return (
     <div>
-      <div className="flex justify-between text-xs mb-1">
-        <span className="font-semibold uppercase">{signal.name}</span>
-        <span>{pct}/100</span>
+      <div className="flex justify-between items-center text-xs mb-1.5">
+        <span className="font-medium text-slate-300 flex items-center gap-1.5">
+          <span>{icons[signal.name] || "•"}</span>
+          <span className="uppercase tracking-wide">{signal.name}</span>
+        </span>
+        <span className="font-mono text-slate-400">{pct}/100</span>
       </div>
-      <div className="w-full bg-slate-200 rounded h-2 mb-1">
-        <div className={`${color} h-2 rounded`} style={{ width: `${pct}%` }} />
+      <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden">
+        <div
+          className="h-1.5 rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
       </div>
-      <p className="text-xs text-slate-500">{signal.reason}</p>
+      <p className="text-xs text-slate-500 mt-1">{signal.reason}</p>
     </div>
   );
 }

@@ -152,6 +152,8 @@ class TrustEngine:
             not in (trust_dna.known_countries if trust_dna else []),
         }
         plan = await plan_orchestration(context)
+        agent_reasoning = plan.get("reasoning", "")
+        tools_called = plan.get("tools_to_call", [])
 
         # 2. Collecte uniquement les signaux sélectionnés par l'agent
         signals: list[SignalScore] = []
@@ -193,20 +195,26 @@ class TrustEngine:
             risk_level=risk_level,
             decision=decision,
             explanation=fallback_explanation,
+            agent_reasoning=agent_reasoning,
+            tools_called=tools_called,
         )
 
         explanation = await explain_decision(user_name, partial_result)
 
         # 6. Résultat final
+    
         return TrustScoreResult(
-            user_id=user_id,
-            session_id=session_id,
-            signals=signals,
-            final_score=round(final_score, 1),
-            risk_level=risk_level,
-            decision=decision,
-            explanation=explanation,
-        )
+          user_id=user_id,
+          session_id=session_id,
+          signals=signals,
+          final_score=round(final_score, 1),
+          risk_level=risk_level,
+          decision=decision,
+          explanation=explanation,
+          agent_reasoning=agent_reasoning,
+          tools_called=tools_called,
+          session_count=trust_dna.session_count if trust_dna else 0,
+      )
 
     # ------------------------------------------------------------------
     # Fallback local (si le LLM est indisponible)
@@ -220,13 +228,32 @@ class TrustEngine:
     ) -> str:
         """Génère une explication lisible — utilisée si le Copilot LLM échoue."""
         weak_signals = [s for s in signals if s.score < 60]
+
+        recommendation = {
+            DecisionAction.ALLOW: "Aucune action requise.",
+            DecisionAction.REQUIRE_MFA: (
+                "Recommandation : valider l'identité via un second facteur "
+                "avant d'autoriser l'accès."
+            ),
+            DecisionAction.REQUIRE_ADMIN_APPROVAL: (
+                "Recommandation : notifier un administrateur pour validation "
+                "manuelle avant tout accès."
+            ),
+            DecisionAction.BLOCK: (
+                "Recommandation : bloquer la session et notifier l'utilisateur "
+                "via un canal de confiance (SMS/email vérifié)."
+            ),
+        }.get(decision, "")
+
         if weak_signals:
-            reasons = "; ".join(s.reason for s in weak_signals)
+            weakest = min(weak_signals, key=lambda s: s.score)
             return (
                 f"Risque {risk_level.value} → {decision.value}. "
-                f"Signaux préoccupants : {reasons}."
+                f"Le signal le plus préoccupant est « {weakest.name} » : "
+                f"{weakest.reason}. {recommendation}"
             )
         return (
             f"Risque {risk_level.value} → {decision.value}. "
-            f"Tous les signaux sont cohérents avec le profil habituel."
+            f"Tous les signaux sont cohérents avec le profil habituel. "
+            f"{recommendation}"
         )

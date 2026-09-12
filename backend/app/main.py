@@ -13,6 +13,7 @@ from app.database import engine, get_db
 from app.models import User
 from app.routers.auth import router as auth_router
 from app.routers.demo import router as demo_router
+from app.routers.trust import router as trust_router
 
 settings = get_settings()
 
@@ -32,16 +33,20 @@ app = FastAPI(
 )
 
 
+if settings.cors_origins == "*":
+    origins = ["*"]
+else:
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # à restreindre en prod
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-
 app.include_router(auth_router)
 app.include_router(demo_router)
+app.include_router(trust_router)

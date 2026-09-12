@@ -1,7 +1,7 @@
 """
 Schémas exposés par l'API Trust Mesh (entrée/sortie du endpoint d'authentification).
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -13,7 +13,7 @@ class LoginRequest(BaseModel):
     device_id: str
     ip_address: Optional[str] = None
     claimed_country: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class LoginDecisionResponse(BaseModel):

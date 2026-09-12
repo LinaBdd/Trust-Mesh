@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models import User, TrustDNAModel, TrustScoreLog
 from app.schemas.auth import LoginRequest, LoginDecisionResponse
 from app.services import TrustEngine
+from app.models.login_attempt import LoginAttempt
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 trust_engine = TrustEngine()
@@ -78,6 +79,14 @@ async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
             trust_dna.usual_login_hours = [*trust_dna.usual_login_hours, login_hour]
         trust_dna.session_count += 1
 
+    attempt = LoginAttempt(
+        user_id=user.id,
+        session_id=session_id,
+        device_id=payload.device_id,
+        ip_address=payload.ip_address,
+        claimed_country=payload.claimed_country,
+    )
+    db.add(attempt)
     await db.commit()
 
     return LoginDecisionResponse(

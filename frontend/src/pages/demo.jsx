@@ -3,49 +3,79 @@ import { triggerSimSwap, resetDemo } from "../api";
 
 export default function Demo() {
   const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
   const phone = "+213555000111";
 
   const attack = async () => {
-    await triggerSimSwap({
-      phone_number: phone,
-      hours_since_swap: 2.0,
-      real_country: "RU",
-      device_id: "unknown-device",
-    });
-    setMsg("✅ Attaque SIM Swap activée — va sur Login et utilise country=RU");
+    setBusy(true);
+    try {
+      await triggerSimSwap({
+        phone_number: phone,
+        hours_since_swap: 2.0,
+        real_country: "RU",
+        device_id: "unknown-device",
+      });
+      setMsg("success");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const reset = async () => {
-    await resetDemo(phone);
-    setMsg("✅ Scénario réinitialisé");
+    setBusy(true);
+    try {
+      await resetDemo(phone);
+      setMsg("reset");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-8">
-      <h1 className="text-3xl font-bold mb-6">🎬 Demo — Simuler une attaque</h1>
+    <div className="max-w-3xl mx-auto px-6 py-10">
+      <h1 className="text-2xl font-bold text-white mb-1">Simulateur d'attaque</h1>
+      <p className="text-slate-400 text-sm mb-8">
+        Déclenche un scénario de fraude réel pour tester la détection en direct.
+      </p>
 
-      <div className="bg-white p-6 rounded-xl shadow max-w-2xl">
-        <p className="mb-4 text-slate-600">
-          Ce bouton simule un remplacement de SIM malveillant via l'API CAMARA SIM Swap.
-          Ensuite, va sur Login avec <code>country=RU</code> et <code>device=unknown-device</code>.
-        </p>
+      <div className="bg-[#111722] rounded-2xl p-6 glow-border">
+        <div className="flex items-start gap-3 mb-6 p-4 bg-red-500/5 border border-red-500/20 rounded-xl">
+          <span className="text-2xl">⚠️</span>
+          <p className="text-sm text-slate-300 leading-relaxed">
+            Ce scénario simule un remplacement de SIM malveillant détecté via l'API CAMARA SIM Swap.
+            Après activation, va sur <span className="text-blue-400 font-medium">Login</span> avec
+            le pays <span className="text-blue-400 font-medium">Russie</span> et le device ID{" "}
+            <span className="text-blue-400 font-medium">unknown-device</span>.
+          </p>
+        </div>
 
         <div className="flex gap-3">
           <button
             onClick={attack}
-            className="bg-red-600 text-white px-6 py-3 rounded font-semibold hover:bg-red-700"
+            disabled={busy}
+            className="flex-1 bg-gradient-to-r from-red-500 to-red-700 text-white py-3 rounded-lg font-semibold text-sm hover:opacity-90 disabled:opacity-40 transition shadow-lg shadow-red-500/20"
           >
-            🔴 Simuler SIM Swap
+            🔴 Simuler l'attaque
           </button>
           <button
             onClick={reset}
-            className="bg-slate-600 text-white px-6 py-3 rounded font-semibold hover:bg-slate-700"
+            disabled={busy}
+            className="px-6 bg-white/5 border border-white/10 text-slate-300 rounded-lg font-semibold text-sm hover:bg-white/10 disabled:opacity-40 transition"
           >
             ♻️ Reset
           </button>
         </div>
 
-        {msg && <p className="mt-4 text-green-600">{msg}</p>}
+        {msg === "success" && (
+          <p className="mt-4 text-sm text-emerald-400 animate-fade-in-up">
+            ✅ Attaque activée — teste maintenant le Login.
+          </p>
+        )}
+        {msg === "reset" && (
+          <p className="mt-4 text-sm text-slate-400 animate-fade-in-up">
+            ✅ Scénario réinitialisé.
+          </p>
+        )}
       </div>
     </div>
   );
