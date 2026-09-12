@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import Login from "./pages/login";
-import Dashboard from "./pages/Dashboard";
-import Demo from "./pages/Demo";
+import Dashboard from "./pages/dashboard";
+import Demo from "./pages/demo";
 
 function Nav() {
   const location = useLocation();

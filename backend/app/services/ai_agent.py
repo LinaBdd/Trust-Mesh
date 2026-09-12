@@ -12,7 +12,7 @@ settings = get_settings()
 try:
     from groq import Groq
     _llm_client = Groq(api_key=settings.groq_api_key)
-    _LLM_MODEL = "llama-3.3-70b-versatile"
+    _LLM_MODEL = "openai/gpt-oss-120b"
     LLM_ENABLED = bool(settings.groq_api_key)
     if not LLM_ENABLED:
         logger.warning("GROQ_API_KEY manquant — AI Copilot désactivé")
