@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-psycopg2-binary
+asyncpg
 redis
 python-dotenv
 python-multipart
@@ -9,3 +9,4 @@ pydantic
 pydantic-settings
 PyJWT
 bcrypt
+groq
